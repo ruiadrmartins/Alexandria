@@ -1,7 +1,6 @@
 package it.jaschke.alexandria;
 
 import android.app.Activity;
-import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
 import android.os.Bundle;
@@ -10,6 +9,7 @@ import android.support.v4.app.LoaderManager;
 import android.support.v4.content.CursorLoader;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.util.Patterns;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -18,7 +18,6 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
-
 
 import it.jaschke.alexandria.data.AlexandriaContract;
 import it.jaschke.alexandria.services.BookService;
@@ -37,7 +36,7 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
     private String mScanFormat = "Format:";
     private String mScanContents = "Contents:";
 
-
+    public static final int SCANNER_RESULT_CODE = 1;
 
     public AddBook(){
     }
@@ -79,11 +78,15 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
                     return;
                 }
                 //Once we have an ISBN, start a book intent
-                Intent bookIntent = new Intent(getActivity(), BookService.class);
-                bookIntent.putExtra(BookService.EAN, ean);
-                bookIntent.setAction(BookService.FETCH_BOOK);
-                getActivity().startService(bookIntent);
-                AddBook.this.restartLoader();
+                if(Utility.isNetworkAvailable(getActivity())) {
+                    Intent bookIntent = new Intent(getActivity(), BookService.class);
+                    bookIntent.putExtra(BookService.EAN, ean);
+                    bookIntent.setAction(BookService.FETCH_BOOK);
+                    getActivity().startService(bookIntent);
+                    AddBook.this.restartLoader();
+                } else {
+                    Toast.makeText(getActivity(), "Network is not available.", Toast.LENGTH_SHORT).show();
+                }
             }
         });
 
@@ -96,13 +99,16 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
                 // Hint: Use a Try/Catch block to handle the Intent dispatch gracefully, if you
                 // are using an external app.
                 //when you're done, remove the toast below.
+                /*
                 Context context = getActivity();
                 CharSequence text = "This button should let you scan a book for its barcode!";
                 int duration = Toast.LENGTH_SHORT;
 
                 Toast toast = Toast.makeText(context, text, duration);
-                toast.show();
+                toast.show();*/
 
+                Intent intent = new Intent(getActivity(), ScannerActivity.class);
+                startActivityForResult(intent, SCANNER_RESULT_CODE);
             }
         });
 
@@ -161,24 +167,48 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
             return;
         }
 
+        /**
+         * Extra credits problem #2.1
+         * Manage empty data
+         */
+
         String bookTitle = data.getString(data.getColumnIndex(AlexandriaContract.BookEntry.TITLE));
-        ((TextView) rootView.findViewById(R.id.bookTitle)).setText(bookTitle);
+        if(bookTitle!=null) {
+            ((TextView) rootView.findViewById(R.id.bookTitle)).setText(bookTitle);
+        } else {
+            ((TextView) rootView.findViewById(R.id.bookTitle)).setText(getString(R.string.no_title));
+        }
 
         String bookSubTitle = data.getString(data.getColumnIndex(AlexandriaContract.BookEntry.SUBTITLE));
-        ((TextView) rootView.findViewById(R.id.bookSubTitle)).setText(bookSubTitle);
+        if(bookSubTitle!=null) {
+            ((TextView) rootView.findViewById(R.id.bookSubTitle)).setText(bookSubTitle);
+        }
 
         String authors = data.getString(data.getColumnIndex(AlexandriaContract.AuthorEntry.AUTHOR));
-        String[] authorsArr = authors.split(",");
-        ((TextView) rootView.findViewById(R.id.authors)).setLines(authorsArr.length);
-        ((TextView) rootView.findViewById(R.id.authors)).setText(authors.replace(",","\n"));
+        if(authors!=null) {
+            String[] authorsArr = authors.split(",");
+            ((TextView) rootView.findViewById(R.id.authors)).setLines(authorsArr.length);
+            ((TextView) rootView.findViewById(R.id.authors)).setText(authors.replace(",", "\n"));
+        } else {
+            ((TextView) rootView.findViewById(R.id.authors)).setText(getString(R.string.no_authors));
+        }
+
         String imgUrl = data.getString(data.getColumnIndex(AlexandriaContract.BookEntry.IMAGE_URL));
-        if(Patterns.WEB_URL.matcher(imgUrl).matches()){
-            new DownloadImage((ImageView) rootView.findViewById(R.id.bookCover)).execute(imgUrl);
-            rootView.findViewById(R.id.bookCover).setVisibility(View.VISIBLE);
+        if(imgUrl!=null) {
+            if (Patterns.WEB_URL.matcher(imgUrl).matches()) {
+                if(Utility.isNetworkAvailable(getActivity())) {
+                    new DownloadImage((ImageView) rootView.findViewById(R.id.bookCover)).execute(imgUrl);
+                    rootView.findViewById(R.id.bookCover).setVisibility(View.VISIBLE);
+                }
+            }
         }
 
         String categories = data.getString(data.getColumnIndex(AlexandriaContract.CategoryEntry.CATEGORY));
-        ((TextView) rootView.findViewById(R.id.categories)).setText(categories);
+        if(categories!=null) {
+            ((TextView) rootView.findViewById(R.id.categories)).setText(categories);
+        } else {
+            ((TextView) rootView.findViewById(R.id.categories)).setText(getString(R.string.no_categories));
+        }
 
         rootView.findViewById(R.id.save_button).setVisibility(View.VISIBLE);
         rootView.findViewById(R.id.delete_button).setVisibility(View.VISIBLE);
@@ -203,5 +233,59 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
     public void onAttach(Activity activity) {
         super.onAttach(activity);
         activity.setTitle(R.string.scan);
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if(requestCode==SCANNER_RESULT_CODE) {
+            String eanCode = data.getStringExtra(ScannerActivity.SCANNER_RESULT);
+            String codeType = data.getStringExtra(ScannerActivity.SCANNER_RESULT_TYPE);
+            try {
+                Log.d("ALEX",String.valueOf(eanCode.length()));
+                if (eanCode.length() == 10 && !eanCode.startsWith("978") && codeType.equals("ISBN10")) {
+
+                    /**
+                     *  Extra credits problem #1
+                    ISBN 10 conversion to ISBN 13 is not as simple as
+                    eanStr="978"+eanStr;
+
+                    Adapted from http://stackoverflow.com/questions/17108621/converting-isbn10-to-isbn13
+                     */
+                    eanCode="978"+eanCode.substring(0,9);
+
+                    int multiplier;
+                    int checksum = 0;
+                    for (int i = 0; i < eanCode.length(); i++) {
+                        multiplier = ((i % 2 == 0) ? 1 : 3);
+                        checksum += ((((int) eanCode.charAt(i)) - 48) * multiplier);
+                    }
+                    checksum = 10 - (checksum % 10);
+                    if (checksum==10) checksum = 0;
+                    eanCode += checksum;
+                    Log.d("ALEX","HELLO " + codeType + " " + eanCode);
+
+                } else {
+                    clearFields();
+                    Toast.makeText(getActivity(), "Wrong ISBN length", Toast.LENGTH_SHORT).show();
+                }
+                if (eanCode.length() < 13) {
+                    clearFields();
+                    Toast.makeText(getActivity(), "Wrong ISBN length", Toast.LENGTH_SHORT).show();
+                }
+                ean.setText(eanCode);
+                if (Utility.isNetworkAvailable(getActivity())) {
+                    Intent bookIntent = new Intent(getActivity(), BookService.class);
+                    bookIntent.putExtra(BookService.EAN, eanCode);
+                    bookIntent.setAction(BookService.FETCH_BOOK);
+                    getActivity().startService(bookIntent);
+                } else {
+                    Toast.makeText(getActivity(), "Network is not available.", Toast.LENGTH_SHORT).show();
+                }
+
+            } catch (NumberFormatException e) {
+                Toast.makeText(getActivity(), e.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        }
+        super.onActivityResult(requestCode, resultCode, data);
     }
 }

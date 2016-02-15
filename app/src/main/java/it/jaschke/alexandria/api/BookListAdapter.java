@@ -4,6 +4,7 @@ package it.jaschke.alexandria.api;
 import android.content.Context;
 import android.database.Cursor;
 import android.support.v4.widget.CursorAdapter;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -11,6 +12,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import it.jaschke.alexandria.R;
+import it.jaschke.alexandria.Utility;
 import it.jaschke.alexandria.data.AlexandriaContract;
 import it.jaschke.alexandria.services.DownloadImage;
 
@@ -18,7 +20,6 @@ import it.jaschke.alexandria.services.DownloadImage;
  * Created by saj on 11/01/15.
  */
 public class BookListAdapter extends CursorAdapter {
-
 
     public static class ViewHolder {
         public final ImageView bookCover;
@@ -34,6 +35,7 @@ public class BookListAdapter extends CursorAdapter {
 
     public BookListAdapter(Context context, Cursor c, int flags) {
         super(context, c, flags);
+        mContext = context;
     }
 
     @Override
@@ -41,14 +43,27 @@ public class BookListAdapter extends CursorAdapter {
 
         ViewHolder viewHolder = (ViewHolder) view.getTag();
 
+        /**
+         * Extra credits problem #2.3
+         * Manage empty data
+         */
+
         String imgUrl = cursor.getString(cursor.getColumnIndex(AlexandriaContract.BookEntry.IMAGE_URL));
-        new DownloadImage(viewHolder.bookCover).execute(imgUrl);
+        if(imgUrl!=null && imgUrl.length()>0) {
+            if(Utility.isNetworkAvailable(mContext)) {
+                new DownloadImage(viewHolder.bookCover).execute(imgUrl);
+            }
+        }
 
         String bookTitle = cursor.getString(cursor.getColumnIndex(AlexandriaContract.BookEntry.TITLE));
-        viewHolder.bookTitle.setText(bookTitle);
+        if(bookTitle!=null) {
+            viewHolder.bookTitle.setText(bookTitle);
+        }
 
         String bookSubTitle = cursor.getString(cursor.getColumnIndex(AlexandriaContract.BookEntry.SUBTITLE));
-        viewHolder.bookSubTitle.setText(bookSubTitle);
+        if(bookSubTitle!=null) {
+            viewHolder.bookSubTitle.setText(bookSubTitle);
+        }
     }
 
     @Override
