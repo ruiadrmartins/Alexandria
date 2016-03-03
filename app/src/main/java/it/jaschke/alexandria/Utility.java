@@ -5,11 +5,12 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 
 /**
- * Created by ruimartins on 04-02-2016.
+ * General Utilities for app
  */
 public class Utility {
     /**
      * Returns true if the network is available or about to become available.
+     * Adapter from Audacity Nanodegree Network Availability code from Sunshine app
      *
      * @param c Context used to get the ConnectivityManager
      * @return true if the network is available

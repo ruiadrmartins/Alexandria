@@ -55,7 +55,7 @@ public class ScannerActivity extends Activity implements ZBarScannerView.ResultH
         String ean = rawResult.getContents();
         String format = rawResult.getBarcodeFormat().getName();
 
-        if(format.contains("ISBN") || format.contains("EAN")) {
+        if(format.contains(getString(R.string.isbn)) || format.contains(getString(R.string.ean))) {
             scannedCode = ean;
             codeType = format;
         }

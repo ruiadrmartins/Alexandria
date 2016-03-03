@@ -9,7 +9,6 @@ import android.support.v4.app.LoaderManager;
 import android.support.v4.content.CursorLoader;
 import android.text.Editable;
 import android.text.TextWatcher;
-import android.util.Log;
 import android.util.Patterns;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -85,7 +84,7 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
                     getActivity().startService(bookIntent);
                     AddBook.this.restartLoader();
                 } else {
-                    Toast.makeText(getActivity(), "Network is not available.", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getActivity(), getString(R.string.network_not_available), Toast.LENGTH_SHORT).show();
                 }
             }
         });
@@ -99,13 +98,6 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
                 // Hint: Use a Try/Catch block to handle the Intent dispatch gracefully, if you
                 // are using an external app.
                 //when you're done, remove the toast below.
-                /*
-                Context context = getActivity();
-                CharSequence text = "This button should let you scan a book for its barcode!";
-                int duration = Toast.LENGTH_SHORT;
-
-                Toast toast = Toast.makeText(context, text, duration);
-                toast.show();*/
 
                 Intent intent = new Intent(getActivity(), ScannerActivity.class);
                 startActivityForResult(intent, SCANNER_RESULT_CODE);
@@ -235,13 +227,15 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
         activity.setTitle(R.string.scan);
     }
 
+    /*
+     * Handle Response from ScannerActivity
+     */
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         if(requestCode==SCANNER_RESULT_CODE) {
             String eanCode = data.getStringExtra(ScannerActivity.SCANNER_RESULT);
             String codeType = data.getStringExtra(ScannerActivity.SCANNER_RESULT_TYPE);
             try {
-                Log.d("ALEX",String.valueOf(eanCode.length()));
                 if (eanCode.length() == 10 && !eanCode.startsWith("978") && codeType.equals("ISBN10")) {
 
                     /**
@@ -262,15 +256,14 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
                     checksum = 10 - (checksum % 10);
                     if (checksum==10) checksum = 0;
                     eanCode += checksum;
-                    Log.d("ALEX","HELLO " + codeType + " " + eanCode);
 
                 } else {
                     clearFields();
-                    Toast.makeText(getActivity(), "Wrong ISBN length", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getActivity(), getString(R.string.wrong_isbn_length), Toast.LENGTH_SHORT).show();
                 }
                 if (eanCode.length() < 13) {
                     clearFields();
-                    Toast.makeText(getActivity(), "Wrong ISBN length", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getActivity(), getString(R.string.wrong_isbn_length), Toast.LENGTH_SHORT).show();
                 }
                 ean.setText(eanCode);
                 if (Utility.isNetworkAvailable(getActivity())) {
@@ -279,7 +272,7 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
                     bookIntent.setAction(BookService.FETCH_BOOK);
                     getActivity().startService(bookIntent);
                 } else {
-                    Toast.makeText(getActivity(), "Network is not available.", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getActivity(), getString(R.string.network_not_available), Toast.LENGTH_SHORT).show();
                 }
 
             } catch (NumberFormatException e) {
